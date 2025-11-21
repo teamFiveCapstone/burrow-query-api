@@ -50,6 +50,16 @@ class RetrieveRequest(BaseModel):
         default=SearchMode.VECTOR,
         description="Search mode: vector, keyword, or hybrid"
     )
+    rerank: bool = Field(
+        default=False,
+        description="Whether to apply reranking using Cohere Rerank"
+    )
+    rerank_top_n: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=50,
+        description="Number of results after reranking (defaults to top_k)"
+    )
     filters: Optional[MetadataFilters] = Field(
         default=None,
         description="Optional metadata filters"

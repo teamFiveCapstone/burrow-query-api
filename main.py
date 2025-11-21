@@ -142,8 +142,10 @@ async def retrieve(request: RetrieveRequest):
     - **keyword**: Text/keyword search using PostgreSQL full-text search
     - **hybrid**: Combined vector + keyword search for best results
 
+    Optional reranking with Cohere Rerank (via AWS Bedrock) for improved relevance.
+
     Args:
-        request: RetrieveRequest with query, top_k, mode, and optional filters
+        request: RetrieveRequest with query, top_k, mode, rerank options, and filters
 
     Returns:
         RetrieveResponse with retrieved nodes
@@ -158,15 +160,30 @@ async def retrieve(request: RetrieveRequest):
         # Convert filters
         llama_filters = convert_filters(request.filters)
 
+        # When reranking, retrieve more candidates for better results
+        retrieval_top_k = request.top_k * 3 if request.rerank else request.top_k
+
         # Get retriever with appropriate mode
         retriever = vector_store_manager.get_retriever(
-            similarity_top_k=request.top_k,
+            similarity_top_k=retrieval_top_k,
             filters=llama_filters,
             mode=internal_mode,
         )
 
         # Retrieve nodes
         nodes = retriever.retrieve(request.query)
+        logger.info(f"Initial retrieval: {len(nodes)} nodes")
+
+        # Apply reranking if requested
+        if request.rerank and nodes:
+            rerank_top_n = request.rerank_top_n or request.top_k
+            logger.info(f"Applying reranking, top_n={rerank_top_n}")
+            nodes = vector_store_manager.rerank_nodes(
+                nodes=nodes,
+                query=request.query,
+                top_n=rerank_top_n,
+            )
+            logger.info(f"After reranking: {len(nodes)} nodes")
 
         # Convert to response format
         node_responses = [

@@ -4,6 +4,7 @@ from llama_index.vector_stores.postgres import PGVectorStore
 from llama_index.embeddings.bedrock import BedrockEmbedding
 from llama_index.core import Settings as LlamaSettings
 from config import settings
+from reranker import BedrockCohereRerank
 import logging
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ class VectorStoreManager:
         self.vector_store = None
         self.index = None
         self.embed_model = None
+        self.reranker = None
 
     def initialize(self):
         """Initialize the vector store, embedding model, and index."""
@@ -49,6 +51,13 @@ class VectorStoreManager:
             logger.info("Creating VectorStoreIndex from existing store")
             self.index = VectorStoreIndex.from_vector_store(
                 vector_store=self.vector_store
+            )
+
+            # Initialize reranker
+            logger.info("Initializing Bedrock Cohere Reranker")
+            self.reranker = BedrockCohereRerank(
+                region_name=settings.aws_region,
+                top_n=10,  # Default, can be overridden per request
             )
 
             logger.info("Vector store initialization complete")
@@ -114,6 +123,23 @@ class VectorStoreManager:
             kwargs["sparse_top_k"] = similarity_top_k
 
         return self.index.as_query_engine(**kwargs)
+
+    def rerank_nodes(self, nodes, query: str, top_n: int = 5):
+        """
+        Rerank retrieved nodes using Bedrock Cohere Rerank.
+
+        Args:
+            nodes: List of NodeWithScore from retrieval
+            query: Original query string
+            top_n: Number of top results to return after reranking
+
+        Returns:
+            Reranked list of NodeWithScore
+        """
+        if not self.reranker:
+            raise RuntimeError("Reranker not initialized.")
+
+        return self.reranker.rerank(query=query, nodes=nodes, top_n=top_n)
 
 
 # Global vector store manager instance
