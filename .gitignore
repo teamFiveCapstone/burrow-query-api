@@ -60,4 +60,5 @@ logs/
 temp/
 
 CLAUDE.md
-LlamaIndexPostgres.md
+LlamaIndex Postgres.md
+.gitignore
