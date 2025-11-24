@@ -36,11 +36,14 @@ jobs:
       with:
         images: burrowai/query-api
         tags: |
+          # For version tags: create semantic version tags (0.0.1, 0.0, 0)
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
           type=semver,pattern={{major}}
+          # For branch pushes: create a tag with the branch name
           type=ref,event=branch
-          type=sha,prefix={{branch}}-
+          # For branch pushes only: also tag with branch name and git SHA
+          type=sha,prefix={{branch}}-,event=branch
     
     - name: Build and push
       uses: docker/build-push-action@v5
