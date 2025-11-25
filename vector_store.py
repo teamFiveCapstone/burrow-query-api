@@ -25,7 +25,7 @@ class VectorStoreManager:
             # Initialize Bedrock embedding model
             logger.info(f"Initializing Bedrock embedding model: {settings.bedrock_model_id}")
             self.embed_model = BedrockEmbedding(
-                model=settings.bedrock_model_id,
+                model_name=settings.bedrock_model_id,
                 region_name=settings.aws_region,
             )
 
