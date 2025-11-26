@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     api_version: str = "1.0.0"
     api_description: str = "Vector database query API for document retrieval"
 
+    #ZACH ADDED this for JWT
+    api_token: str = ""
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
