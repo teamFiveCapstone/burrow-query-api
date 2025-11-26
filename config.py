@@ -6,14 +6,14 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Database configuration
-    db_name: str = "embeddings"
-    db_user: str = "burrow"
-    db_password: str = "capstone"
-    db_host: str = "burrow-serverless-wilson.cluster-cwxgyacqyoae.us-east-1.rds.amazonaws.com"
+    db_name: str = "burrowdb"
+    db_user: str = "burrow_admin"
+    db_password: str = "dummy"
+    db_host: str = "localhost"
     db_port: int = 5432
 
     # Vector store configuration
-    table_name: str = "burrow_table_hybrid"  # PGVectorStore adds "data_" prefix
+    table_name: str = "burrow_table_hybrid2"  # PGVectorStore adds "data_" prefix
     embed_dim: int = 1024  # Amazon Titan default dimension
 
     # AWS Bedrock configuration
@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        #I added this so when it reads the environ vairables that are uppercase it will still use them
+        case_sensitive = False
 
     @property
     def database_url(self) -> str:
