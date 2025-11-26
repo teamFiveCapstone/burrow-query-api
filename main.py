@@ -1,5 +1,6 @@
 """FastAPI application for querying vector database."""
-from fastapi import FastAPI, HTTPException, status
+#ZACH ADDED Depends import
+from fastapi import FastAPI, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
@@ -20,6 +21,9 @@ from llama_index.core.vector_stores.types import (
     MetadataFilter as LlamaMetadataFilter,
     FilterOperator,
 )
+
+#ZACH ADDED verify_api_token import
+from security import verify_api_token
 
 # Configure logging
 logging.basicConfig(
@@ -132,7 +136,7 @@ async def health_check():
         )
 
 
-@app.post("/query-service/retrieve", response_model=RetrieveResponse, tags=["Retrieval"])
+@app.post("/query-service/retrieve", response_model=RetrieveResponse, tags=["Retrieval"], dependencies=[Depends(verify_api_token)])
 async def retrieve(request: RetrieveRequest):
     """
     Retrieve top-K most similar documents.
@@ -212,7 +216,7 @@ async def retrieve(request: RetrieveRequest):
         )
 
 
-@app.post("/query-service/query", response_model=QueryResponse, tags=["Query"])
+@app.post("/query-service/query", response_model=QueryResponse, tags=["Query"], dependencies=[Depends(verify_api_token)])
 async def query(request: QueryRequest):
     """
     Query with RAG synthesis.
