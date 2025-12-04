@@ -1,12 +1,8 @@
-"""Bedrock Cohere Reranker implementation."""
 import json
-import logging
 from typing import List
-
 import boto3
-from llama_index.core.schema import NodeWithScore, TextNode
-
-logger = logging.getLogger(__name__)
+from llama_index.core.schema import NodeWithScore
+from logger import log_info, log_exception
 
 
 class BedrockCohereRerank:
@@ -21,23 +17,19 @@ class BedrockCohereRerank:
         self.top_n = top_n
         self._client = boto3.client("bedrock-runtime", region_name=region_name)
 
+        log_info(
+            "Initialized BedrockCohereRerank",
+            model_id=self.model_id,
+            region=self.region_name,
+            default_top_n=self.top_n,
+        )
+
     def rerank(
         self,
         query: str,
         nodes: List[NodeWithScore],
         top_n: int = None,
     ) -> List[NodeWithScore]:
-        """
-        Rerank nodes using Bedrock Cohere model.
-
-        Args:
-            query: Query string
-            nodes: List of NodeWithScore from retrieval
-            top_n: Number of results to return (defaults to self.top_n)
-
-        Returns:
-            Reranked list of NodeWithScore
-        """
         if not nodes:
             return nodes
 
@@ -48,16 +40,21 @@ class BedrockCohereRerank:
             return nodes
 
         try:
-            # Prepare request for Bedrock Cohere Rerank
             request_body = {
                 "query": query,
                 "documents": documents,
                 "top_n": min(top_n, len(documents)),
             }
 
-            logger.info(f"Reranking {len(documents)} documents with Bedrock Cohere")
+            log_info(
+                "Reranking documents with Bedrock Cohere",
+                model_id=self.model_id,
+                document_count=len(documents),
+                requested_top_n=top_n,
+                effective_top_n=request_body["top_n"],
+                query_preview=query[:100],
+            )
 
-            # Call Bedrock
             response = self._client.invoke_model(
                 modelId=self.model_id,
                 body=json.dumps(request_body),
@@ -65,19 +62,20 @@ class BedrockCohereRerank:
                 accept="application/json",
             )
 
-            # Parse response
             response_body = json.loads(response["body"].read())
             results = response_body.get("results", [])
 
-            logger.info(f"Reranking complete, got {len(results)} results")
+            log_info(
+                "Reranking completed",
+                model_id=self.model_id,
+                result_count=len(results),
+            )
 
-            # Reorder nodes based on rerank results
             reranked_nodes = []
             for result in results:
                 idx = result["index"]
                 relevance_score = result["relevance_score"]
 
-                # Create new NodeWithScore with updated score
                 original_node = nodes[idx]
                 reranked_node = NodeWithScore(
                     node=original_node.node,
@@ -87,7 +85,12 @@ class BedrockCohereRerank:
 
             return reranked_nodes
 
-        except Exception as e:
-            logger.error(f"Reranking failed: {e}")
-            # Return original nodes (truncated) if reranking fails
+        except Exception:
+            log_exception(
+                "Reranking failed",
+                model_id=self.model_id,
+                document_count=len(documents),
+                top_n=top_n,
+                query_preview=query[:100],
+            )
             return nodes[:top_n]
