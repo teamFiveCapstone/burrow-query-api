@@ -1,18 +1,13 @@
-"""Vector store initialization and management."""
 from llama_index.core import VectorStoreIndex
 from llama_index.vector_stores.postgres import PGVectorStore
 from llama_index.embeddings.bedrock import BedrockEmbedding
 from llama_index.core import Settings as LlamaSettings
 from config import settings
 from reranker import BedrockCohereRerank
-import logging
-
-logger = logging.getLogger(__name__)
+from logger import log_info, log_error, log_exception
 
 
 class VectorStoreManager:
-    """Manages vector store and index initialization."""
-
     def __init__(self):
         self.vector_store = None
         self.index = None
@@ -20,20 +15,28 @@ class VectorStoreManager:
         self.reranker = None
 
     def initialize(self):
-        """Initialize the vector store, embedding model, and index."""
         try:
-            # Initialize Bedrock embedding model
-            logger.info(f"Initializing Bedrock embedding model: {settings.bedrock_model_id}")
+            log_info(
+                "Initializing Bedrock embedding model",
+                bedrock_model_id=settings.bedrock_model_id,
+                aws_region=settings.aws_region,
+            )
+
             self.embed_model = BedrockEmbedding(
                 model=settings.bedrock_model_id,
                 region_name=settings.aws_region,
             )
 
-            # Set global embedding model for LlamaIndex
             LlamaSettings.embed_model = self.embed_model
 
-            # Connect to existing vector store with hybrid search enabled
-            logger.info(f"Connecting to vector store table: {settings.table_name}")
+            log_info(
+                "Connecting to PGVectorStore",
+                db_name=settings.db_name,
+                db_host=settings.db_host,
+                table_name=settings.table_name,
+                embed_dim=settings.embed_dim,
+            )
+
             self.vector_store = PGVectorStore.from_params(
                 database=settings.db_name,
                 host=settings.db_host,
@@ -47,38 +50,41 @@ class VectorStoreManager:
                 text_search_config="english",
             )
 
-            # Create index from existing vector store (no document loading needed)
-            logger.info("Creating VectorStoreIndex from existing store")
+            log_info("Creating VectorStoreIndex from existing store")
+
             self.index = VectorStoreIndex.from_vector_store(
                 vector_store=self.vector_store
             )
 
-            # Initialize reranker
-            logger.info("Initializing Bedrock Cohere Reranker")
-            self.reranker = BedrockCohereRerank(
-                region_name=settings.aws_region,
-                top_n=10,  # Default, can be overridden per request
+            log_info(
+                "Initializing Bedrock Cohere Reranker",
+                aws_region=settings.aws_region,
+                default_top_n=10,
             )
 
-            logger.info("Vector store initialization complete")
+            self.reranker = BedrockCohereRerank(
+                region_name=settings.aws_region,
+                top_n=10,
+            )
 
-        except Exception as e:
-            logger.error(f"Failed to initialize vector store: {e}")
+            log_info("Vector store initialization complete")
+
+        except Exception:
+            log_exception("Failed to initialize vector store")
             raise
 
-    def get_retriever(self, similarity_top_k: int = 5, filters=None, mode: str = "default"):
-        """
-        Get a retriever for querying the vector store.
-
-        Args:
-            similarity_top_k: Number of top similar results to return
-            filters: Optional metadata filters
-            mode: Search mode - "default" (vector), "hybrid", or "sparse" (keyword)
-
-        Returns:
-            VectorIndexRetriever instance
-        """
+    def get_retriever(
+        self,
+        similarity_top_k: int = 5,
+        filters=None,
+        mode: str = "default",
+    ):
         if not self.index:
+            log_error(
+                "get_retriever called before initialization",
+                similarity_top_k=similarity_top_k,
+                mode=mode,
+            )
             raise RuntimeError("Vector store not initialized. Call initialize() first.")
 
         kwargs = {
@@ -92,22 +98,27 @@ class VectorStoreManager:
         elif mode == "sparse":
             kwargs["vector_store_query_mode"] = "sparse"
             kwargs["sparse_top_k"] = similarity_top_k
+
+        log_info(
+            "Creating retriever",
+            similarity_top_k=similarity_top_k,
+            mode=mode,
+        )
 
         return self.index.as_retriever(**kwargs)
 
-    def get_query_engine(self, similarity_top_k: int = 5, filters=None, mode: str = "default"):
-        """
-        Get a query engine for RAG-style queries.
-
-        Args:
-            similarity_top_k: Number of top similar results to return
-            filters: Optional metadata filters
-            mode: Search mode - "default" (vector), "hybrid", or "sparse" (keyword)
-
-        Returns:
-            Query engine instance
-        """
+    def get_query_engine(
+        self,
+        similarity_top_k: int = 5,
+        filters=None,
+        mode: str = "default",
+    ):
         if not self.index:
+            log_error(
+                "get_query_engine called before initialization",
+                similarity_top_k=similarity_top_k,
+                mode=mode,
+            )
             raise RuntimeError("Vector store not initialized. Call initialize() first.")
 
         kwargs = {
@@ -121,26 +132,30 @@ class VectorStoreManager:
         elif mode == "sparse":
             kwargs["vector_store_query_mode"] = "sparse"
             kwargs["sparse_top_k"] = similarity_top_k
+
+        log_info(
+            "Creating query engine",
+            similarity_top_k=similarity_top_k,
+            mode=mode,
+        )
 
         return self.index.as_query_engine(**kwargs)
 
     def rerank_nodes(self, nodes, query: str, top_n: int = 5):
-        """
-        Rerank retrieved nodes using Bedrock Cohere Rerank.
-
-        Args:
-            nodes: List of NodeWithScore from retrieval
-            query: Original query string
-            top_n: Number of top results to return after reranking
-
-        Returns:
-            Reranked list of NodeWithScore
-        """
         if not self.reranker:
+            log_error(
+                "rerank_nodes called before reranker initialization",
+                top_n=top_n,
+            )
             raise RuntimeError("Reranker not initialized.")
+
+        log_info(
+            "Reranking nodes",
+            node_count=len(nodes),
+            top_n=top_n,
+        )
 
         return self.reranker.rerank(query=query, nodes=nodes, top_n=top_n)
 
 
-# Global vector store manager instance
 vector_store_manager = VectorStoreManager()
