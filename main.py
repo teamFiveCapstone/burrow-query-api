@@ -10,6 +10,7 @@ from models import (
     QueryResponse,
     NodeResponse,
     HealthResponse,
+    SearchMode,
 )
 from llama_index.core.vector_stores.types import (
     MetadataFilters as LlamaMetadataFilters,
@@ -77,6 +78,10 @@ def convert_filters(filters):
 
     llama_filters = []
     for f in filters.filters:
+
+        if not f.key or f.value is None:
+            continue
+
         operator_map = {
             "==": FilterOperator.EQ,
             ">": FilterOperator.GT,
@@ -94,6 +99,9 @@ def convert_filters(filters):
             operator=operator_map.get(f.operator, FilterOperator.EQ),
         )
         llama_filters.append(llama_filter)
+
+    if not llama_filters:
+        return None
 
     return LlamaMetadataFilters(
         filters=llama_filters,
@@ -163,11 +171,17 @@ async def retrieve(request: RetrieveRequest):
 
         retrieval_top_k = request.top_k * 3 if request.rerank else request.top_k
 
-        retriever = vector_store_manager.get_retriever(
-            similarity_top_k=retrieval_top_k,
-            filters=llama_filters,
-            mode=internal_mode,
-        )
+        if request.mode == SearchMode.HYBRID:
+            retriever = vector_store_manager.get_fusion_retriever(
+                similarity_top_k=retrieval_top_k,
+                filters=llama_filters,
+            )
+        else:
+            retriever = vector_store_manager.get_retriever(
+                similarity_top_k=retrieval_top_k,
+                filters=llama_filters,
+                mode=internal_mode,
+            )
 
         nodes = retriever.retrieve(request.query)
         log_info("Initial retrieval completed", node_count=len(nodes))
@@ -203,17 +217,29 @@ async def retrieve(request: RetrieveRequest):
             total_results=len(node_responses),
         )
 
-    except Exception:
+    except ValueError as e:
+        log_exception("Invalid request parameters", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except RuntimeError as e:
+        log_exception("Service error", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service unavailable",
+        )
+    except Exception as e:
         log_exception(
             "Retrieval failed",
+            error_type=type(e).__name__,
+            error_message=str(e),
             mode=request.mode.value,
             top_k=request.top_k,
-            rerank=request.rerank,
-            query_preview=request.query[:100],
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Retrieval failed",
+            detail=f"Retrieval failed: {type(e).__name__}",
         )
 
 

@@ -2,6 +2,7 @@ from llama_index.core import VectorStoreIndex
 from llama_index.vector_stores.postgres import PGVectorStore
 from llama_index.embeddings.bedrock import BedrockEmbedding
 from llama_index.core import Settings as LlamaSettings
+from llama_index.core.retrievers import QueryFusionRetriever
 from config import settings
 from reranker import BedrockCohereRerank
 from logger import log_info, log_error, log_exception
@@ -140,6 +141,41 @@ class VectorStoreManager:
         )
 
         return self.index.as_query_engine(**kwargs)
+
+    def get_fusion_retriever(self, similarity_top_k: int = 5, filters=None):
+        
+        if not self.index:
+            log_error(
+                "get_fusion_retriever called before initialization",
+                similarity_top_k=similarity_top_k,
+            )
+            raise RuntimeError("Vector store not initialized. Call initialize() first.")
+
+        vector_retriever = self.index.as_retriever(
+            vector_store_query_mode="default",
+            similarity_top_k=similarity_top_k,
+            filters=filters,
+        )
+
+        keyword_retriever = self.index.as_retriever(
+            vector_store_query_mode="sparse",
+            similarity_top_k=similarity_top_k,
+            sparse_top_k=similarity_top_k,
+            filters=filters,
+        )
+
+        log_info(
+            "Creating QueryFusionRetriever for hybrid search",
+            similarity_top_k=similarity_top_k,
+        )
+
+        return QueryFusionRetriever(
+            retrievers=[vector_retriever, keyword_retriever],
+            similarity_top_k=similarity_top_k,
+            num_queries=1,  
+            mode="reciprocal_rerank",
+            use_async=True,
+        )
 
     def rerank_nodes(self, nodes, query: str, top_n: int = 5):
         if not self.reranker:
