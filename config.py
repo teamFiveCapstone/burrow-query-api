@@ -1,7 +1,14 @@
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+    )
+
     db_name: str = "burrowdb"
     db_user: str = "burrow_admin"
     db_password: str = "dummy"
@@ -19,11 +26,6 @@ class Settings(BaseSettings):
     api_description: str = "Vector database query API for document retrieval"
 
     api_token: str = ""
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
 
     @property
     def database_url(self) -> str:
