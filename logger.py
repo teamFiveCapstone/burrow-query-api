@@ -17,7 +17,7 @@ logger.propagate = False
 
 def log_info(message, **fields):
     record = {
-        "timestamp": datetime.datetime.utcnow().isoformat(timespec="milliseconds")
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(timespec="milliseconds")
         + "Z",
         "level": "info",
         "message": message,
@@ -30,7 +30,7 @@ def log_info(message, **fields):
 
 def log_error(message, **fields):
     record = {
-        "timestamp": datetime.datetime.utcnow().isoformat(timespec="milliseconds")
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(timespec="milliseconds")
         + "Z",
         "level": "error",
         "message": message,
@@ -44,7 +44,7 @@ def log_error(message, **fields):
 def log_exception(message, **fields):
     fields["stack"] = traceback.format_exc()
     record = {
-        "timestamp": datetime.datetime.utcnow().isoformat(timespec="milliseconds")
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(timespec="milliseconds")
         + "Z",
         "level": "error",
         "message": message,
