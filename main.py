@@ -19,7 +19,7 @@ from llama_index.core.vector_stores.types import (
 from security import verify_api_token
 from logger import log_info, log_exception
 import time
-import psycopg2
+import asyncpg
 
 
 @asynccontextmanager
@@ -151,15 +151,13 @@ async def get_document_count():
     try:
         log_info("Document count request received")
 
-        conn = psycopg2.connect(
-            dbname=settings.db_name,
+        conn = await asyncpg.connect(
+            database=settings.db_name,
             user=settings.db_user,
             password=settings.db_password,
             host=settings.db_host,
             port=settings.db_port,
         )
-
-        cur = conn.cursor()
 
         query = f"""
             SELECT COUNT(DISTINCT (metadata_->>'doc_id'))
@@ -167,12 +165,10 @@ async def get_document_count():
             WHERE metadata_->>'doc_id' IS NOT NULL
         """
 
-        cur.execute(query)
-        result = cur.fetchone()
-        count = result[0] if result else 0
+        count = await conn.fetchval(query)
+        count = count if count is not None else 0
 
-        cur.close()
-        conn.close()
+        await conn.close()
 
         log_info("Document count query completed", total_documents=count)
 
