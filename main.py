@@ -19,6 +19,7 @@ from llama_index.core.vector_stores.types import (
 from security import verify_api_token
 from logger import log_info, log_exception
 import time
+import psycopg2
 
 
 @asynccontextmanager
@@ -77,7 +78,6 @@ def convert_filters(filters):
 
     llama_filters = []
     for f in filters.filters:
-
         if not f.key or f.value is None:
             continue
 
@@ -108,7 +108,7 @@ def convert_filters(filters):
     )
 
 
-@app.get("/", tags=["Root"])
+@app.get("/", include_in_schema=False)
 async def root():
     return {
         "message": "RAGline Query API",
@@ -117,7 +117,7 @@ async def root():
     }
 
 
-@app.get("/health", response_model=HealthResponse, tags=["Health"])
+@app.get("/health", response_model=HealthResponse, include_in_schema=False)
 async def health_check():
     try:
         is_initialized = vector_store_manager.index is not None
@@ -146,10 +146,56 @@ async def health_check():
         )
 
 
+@app.get("/count", dependencies=[Depends(verify_api_token)])
+async def get_document_count():
+    try:
+        log_info("Document count request received")
+
+        conn = psycopg2.connect(
+            dbname=settings.db_name,
+            user=settings.db_user,
+            password=settings.db_password,
+            host=settings.db_host,
+            port=settings.db_port,
+        )
+
+        cur = conn.cursor()
+
+        query = f"""
+            SELECT COUNT(DISTINCT (metadata_->>'doc_id'))
+            FROM {settings.table_name}
+            WHERE metadata_->>'doc_id' IS NOT NULL
+        """
+
+        cur.execute(query)
+        result = cur.fetchone()
+        count = result[0] if result else 0
+
+        cur.close()
+        conn.close()
+
+        log_info("Document count query completed", total_documents=count)
+
+        return {
+            "total_documents": count,
+            "status": "success",
+        }
+
+    except Exception as e:
+        log_exception(
+            "Document count failed",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve document count",
+        )
+
+
 @app.post(
     "/retrieve",
     response_model=RetrieveResponse,
-    tags=["Retrieval"],
     dependencies=[Depends(verify_api_token)],
 )
 async def retrieve(request: RetrieveRequest):
@@ -239,7 +285,6 @@ async def retrieve(request: RetrieveRequest):
 @app.post(
     "/query",
     response_model=QueryResponse,
-    tags=["Query"],
     dependencies=[Depends(verify_api_token)],
 )
 async def query(request: QueryRequest):
