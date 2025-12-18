@@ -1,3 +1,10 @@
+#For unit tests
+```
+uv run --extra test pytest test_main.py
+```
+
+
+
 # RAGline Query API
 
 A FastAPI-based service for querying vector embeddings stored in PostgreSQL with pgvector. This API provides retrieval endpoints for RAG (Retrieval Augmented Generation) applications.

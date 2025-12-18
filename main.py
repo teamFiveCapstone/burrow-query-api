@@ -9,6 +9,7 @@ from models import (
     QueryRequest,
     QueryResponse,
     NodeResponse,
+    CountResponse,
     HealthResponse,
 )
 from llama_index.core.vector_stores.types import (
@@ -19,6 +20,7 @@ from llama_index.core.vector_stores.types import (
 from security import verify_api_token
 from logger import log_info, log_exception
 import time
+import asyncpg
 
 
 @asynccontextmanager
@@ -37,7 +39,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.api_title,
     version=settings.api_version,
-    description=settings.api_description,
     lifespan=lifespan,
     root_path="/query-service",
 )
@@ -77,7 +78,6 @@ def convert_filters(filters):
 
     llama_filters = []
     for f in filters.filters:
-
         if not f.key or f.value is None:
             continue
 
@@ -108,7 +108,7 @@ def convert_filters(filters):
     )
 
 
-@app.get("/", tags=["Root"])
+@app.get("/", include_in_schema=False)
 async def root():
     return {
         "message": "RAGline Query API",
@@ -117,7 +117,7 @@ async def root():
     }
 
 
-@app.get("/health", response_model=HealthResponse, tags=["Health"])
+@app.get("/health", response_model=HealthResponse, include_in_schema=False)
 async def health_check():
     try:
         is_initialized = vector_store_manager.index is not None
@@ -144,6 +144,62 @@ async def health_check():
             database_connected=False,
             vector_store_initialized=False,
         )
+
+
+@app.get("/count", response_model=CountResponse, tags=["Counts"], dependencies=[Depends(verify_api_token)])
+async def get_document_count():
+    try:
+        log_info("Document count request received")
+
+        conn = await asyncpg.connect(
+            database=settings.db_name,
+            user=settings.db_user,
+            password=settings.db_password,
+            host=settings.db_host,
+            port=settings.db_port,
+        )
+
+        query = f"""
+            SELECT
+                COUNT(DISTINCT (metadata_->>'doc_id')) as document_count,
+                COUNT(*) as chunk_count
+            FROM data_{settings.table_name}
+        """
+
+        row = await conn.fetchrow(query)
+        doc_count = row['document_count'] if row and row['document_count'] is not None else 0
+        chunk_count = row['chunk_count'] if row and row['chunk_count'] is not None else 0
+
+        await conn.close()
+
+        log_info("Document count query completed", total_documents=doc_count, total_chunks=chunk_count)
+
+        return {
+            "total_documents": doc_count,
+            "total_chunks": chunk_count,
+            "status": "success",
+        }
+
+    except Exception as e:
+        error_type = type(e).__name__
+
+        if error_type == "UndefinedTableError":
+            log_info("Table does not exist yet, returning count of 0")
+            return {
+                "total_documents": 0,
+                "total_chunks": 0,
+                "status": "table_not_initialized",
+            }
+        else:
+            log_exception(
+                "Document count failed",
+                error_type=error_type,
+                error_message=str(e),
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve document count",
+            )
 
 
 @app.post(

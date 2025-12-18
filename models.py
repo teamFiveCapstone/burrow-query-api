@@ -102,6 +102,12 @@ class QueryResponse(BaseModel):
     query: str = Field(..., description="Original query")
 
 
+class CountResponse(BaseModel):
+    total_documents: int = Field(..., description="Total number of unique documents")
+    total_chunks: int = Field(..., description="Total number of chunks/vectors")
+    status: str = Field(..., description="Query status")
+
+
 class HealthResponse(BaseModel):
     status: str = Field(..., description="Service status")
     database_connected: bool = Field(..., description="Database connection status")
