@@ -1,9 +1,9 @@
 from fastapi import FastAPI, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from config import settings
-from vector_store import vector_store_manager
-from models import (
+from utils.config import settings
+from services.vector_store import vector_store_manager
+from utils.models import (
     RetrieveRequest,
     RetrieveResponse,
     QueryRequest,
@@ -17,8 +17,8 @@ from llama_index.core.vector_stores.types import (
     MetadataFilter as LlamaMetadataFilter,
     FilterOperator,
 )
-from security import verify_api_token
-from logger import log_info, log_exception
+from services.security import verify_api_token
+from utils.logger import log_info, log_exception
 import time
 import asyncpg
 

@@ -1,8 +1,8 @@
 # security.py
 from fastapi import HTTPException, status, Security
 from fastapi.security import APIKeyHeader
-from config import settings
-from logger import log_error
+from utils.config import settings
+from utils.logger import log_error
 
 api_key_header = APIKeyHeader(name="x-api-token", auto_error=False)
 

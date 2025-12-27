@@ -2,7 +2,7 @@ import json
 from typing import List
 import boto3
 from llama_index.core.schema import NodeWithScore
-from logger import log_info, log_exception
+from utils.logger import log_info, log_exception
 
 
 class BedrockCohereRerank:
