@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     aws_region: str = "us-east-1"
     bedrock_model_id: str = "amazon.titan-embed-text-v2:0"
-    bedrock_llm_model_id: str = "amazon.titan-text-premier-v1:0"
+    bedrock_llm_model_id: str = "amazon.titan-text-express-v1"
 
     api_title: str = "Burrow Query API"
     api_version: str = "1.0.0"
