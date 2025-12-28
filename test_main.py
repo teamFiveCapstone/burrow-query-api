@@ -58,7 +58,7 @@ def mock_vector_store_manager(mocker, mock_nodes):
 
 @pytest.fixture(autouse=True)
 def mock_settings(mocker, valid_api_token):
-    mock_settings = mocker.patch("security.settings")
+    mock_settings = mocker.patch("services.security.settings")
     mock_settings.api_token = valid_api_token
     return mock_settings
 

@@ -1,10 +1,11 @@
 from llama_index.core import VectorStoreIndex
 from llama_index.vector_stores.postgres import PGVectorStore
 from llama_index.embeddings.bedrock import BedrockEmbedding
+from llama_index.llms.bedrock import Bedrock
 from llama_index.core import Settings as LlamaSettings
-from config import settings
-from reranker import BedrockCohereRerank
-from logger import log_info, log_error, log_exception
+from utils.config import settings
+from services.reranker import BedrockCohereRerank
+from utils.logger import log_info, log_error, log_exception
 
 
 class VectorStoreManager:
@@ -12,6 +13,7 @@ class VectorStoreManager:
         self.vector_store = None
         self.index = None
         self.embed_model = None
+        self.llm = None
         self.reranker = None
 
     def initialize(self):
@@ -28,6 +30,20 @@ class VectorStoreManager:
             )
 
             LlamaSettings.embed_model = self.embed_model
+
+            log_info(
+                "Initializing Bedrock LLM",
+                bedrock_llm_model_id=settings.bedrock_llm_model_id,
+                aws_region=settings.aws_region,
+            )
+
+            self.llm = Bedrock(
+                model=settings.bedrock_llm_model_id,
+                region_name=settings.aws_region,
+                context_size=8192,
+            )
+
+            LlamaSettings.llm = self.llm
 
             log_info(
                 "Connecting to PGVectorStore",
