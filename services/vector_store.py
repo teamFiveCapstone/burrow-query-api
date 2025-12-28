@@ -40,7 +40,7 @@ class VectorStoreManager:
             self.llm = Bedrock(
                 model=settings.bedrock_llm_model_id,
                 region_name=settings.aws_region,
-                context_size=200000,
+                context_size=32000,
             )
 
             LlamaSettings.llm = self.llm
